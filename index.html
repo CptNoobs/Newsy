@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="initial-scale=1" />
-  <title>The globe of extremes</title>
+  <title>Sample News Globe</title>
 
   <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css" />
   <link rel="stylesheet" href="./style.css" />
@@ -35,12 +35,17 @@
       "esri/geometry/Point",
       "esri/geometry/Mesh",
 
-      "esri/core/watchUtils"
-    ], function (Map, SceneView, TileLayer, GeoJSONLayer, Basemap, ExaggeratedElevationLayer, Graphic, Point, Mesh, watchUtils) {
+      "esri/core/watchUtils",
+      "esri/rest/locator"
+    ], function (Map, SceneView, TileLayer, GeoJSONLayer, Basemap, ExaggeratedElevationLayer, Graphic, Point, Mesh, watchUtils, locator) {
 
 
       const R = 6358137; // approximate radius of the Earth in m
       const offset = 300000; // offset from the ground used for the clouds
+
+      // Replace with your own NewsAPI.org key
+      const NEWS_API_KEY = "YOUR_NEWSAPI_KEY";
+      const geocodeUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
 
       const basemap = new Basemap({
         baseLayers: [
@@ -160,13 +165,13 @@
 
       view.graphics.add(clouds);
 
-      const extremesLayer = new GeoJSONLayer({
-        url: "extreme-points.geojson",
+      const newsLayer = new GeoJSONLayer({
+        url: "sample-news.geojson",
         elevationInfo: {
           mode: "absolute-height",
           offset: offset
         },
-        copyright: "Data from <a href=\"https://en.wikipedia.org/wiki/Extreme_points_of_Earth\" target=\"_blank\">Extreme points on Earth</a> Wikipedia article | <a href=\"https://visibleearth.nasa.gov/view.php?id=57747\" target=\"_blank\">Cloud image</a> from NASA Goddard Space Flight Center (image by Reto Stöckli) for the cloud layer",
+        copyright: "Sample news data for demonstration purposes | <a href=\"https://visibleearth.nasa.gov/view.php?id=57747\" target=\"_blank\">Cloud image</a> from NASA Goddard Space Flight Center (image by Reto St\u00f6ckli) for the cloud layer",
         renderer: {
           type: "simple",
           symbol: {
@@ -188,30 +193,87 @@
         },
         popupTemplate: {
           title: "{name}",
-          content: `
-            <div class="popupImage">
-              <img src="{imageUrl}" alt="{imageCaption}"/>
-            </div>
-            <div class="popupImageCaption">{imageCaption}</div>
-            <div class="popupDescription">
-              <p class="info">
-                <span class="esri-icon-favorites"></span> {type}
-              </p>
-              <p class="info">
-                <span class="esri-icon-map-pin"></span> {location}
-              </p>
-              <p class="info">
-                <span class="esri-icon-documentation"></span> {facts}
-              </p>
-            </div>
-            <div class="popupCredits">
-              Sources: <a href="{sourceUrl}" target="_blank">{source}</a> released under <a href="{sourceCopyrightUrl}">{sourceCopyright}</a>, <a href="{imageCopyrightUrl}" target="_blank">{imageCopyright}</a>.
-            </div>
-          `
+          content: getNewsContent
         }
       });
 
-      map.layers.add(extremesLayer);
+      map.layers.add(newsLayer);
+
+      function showNewsAtPoint(point) {
+        locator.locationToAddress(geocodeUrl, { location: point }).then(function(res){
+          const code = res.attributes.CountryCode;
+          if (!code) {
+            view.popup.open({ location: point, title: "News", content: "Could not determine location." });
+            return;
+          }
+          fetch(`https://newsapi.org/v2/top-headlines?country=${code}&apiKey=${NEWS_API_KEY}`)
+            .then(r => r.json()).then(function(data){
+              if (data.articles && data.articles.length > 0) {
+                const article = data.articles[0];
+                view.popup.open({
+                  location: point,
+                  title: article.title,
+                  content: `<p>${article.description || ""}</p><p><a href="${article.url}" target="_blank">Read more</a></p>`
+                });
+              } else {
+                view.popup.open({ location: point, title: "News", content: `No news found for ${code}` });
+              }
+            })
+            .catch(function(){
+              view.popup.open({ location: point, title: "News", content: "Unable to fetch news." });
+            });
+        }).catch(function(){
+          view.popup.open({ location: point, title: "News", content: "Could not determine location." });
+        });
+      }
+
+      view.on("click", function(event){
+        view.hitTest(event).then(function(hit){
+          const hasFeature = hit.results.some(function(r){
+            return r.graphic.layer === newsLayer;
+          });
+          if (!hasFeature) {
+            showNewsAtPoint(event.mapPoint);
+          }
+        });
+      });
+
+      function getNewsContent(feature) {
+        const point = feature.graphic.geometry;
+        const locationPromise = locator.locationToAddress(geocodeUrl, { location: point })
+          .catch(() => ({ attributes: { CountryCode: "" } }));
+
+        return locationPromise.then(function(result) {
+          const code = result.attributes.CountryCode || "";
+          if (!code) {
+            return `<p>Could not determine location.</p>`;
+          }
+          return fetch(`https://newsapi.org/v2/top-headlines?country=${code}&apiKey=${NEWS_API_KEY}`)
+            .then(r => r.json())
+            .then(function(data) {
+              if (data.articles && data.articles.length > 0) {
+                const article = data.articles[0];
+                return `
+                  <div class="popupDescription">
+                    <p class="info"><span class="esri-icon-documentation"></span> ${article.title}</p>
+                    <p>${article.description || ""}</p>
+                    <p><a href="${article.url}" target="_blank">Read more</a></p>
+                  </div>`;
+              } else {
+                return `<p>No news found for ${code}</p>`;
+              }
+            })
+            .catch(function() {
+              const props = feature.graphic.attributes;
+              return `
+                <div class="popupDescription">
+                  <p class="info"><span class="esri-icon-documentation"></span> ${props.newsTitle || "No news"}</p>
+                  <p>${props.newsSummary || ""}</p>
+                  ${props.newsUrl ? `<p><a href="${props.newsUrl}" target="_blank">Read more</a></p>` : ""}
+                </div>`;
+            });
+        });
+      }
 
       document.getElementById("close-about").addEventListener("click", closeMenu);
 
@@ -267,11 +329,9 @@
   </div>
   <div id="container">
     <div id="introDiv">
-      <h1>The globe of extremes</h1>
+      <h1>Sample News Globe</h1>
       <div id="show-intro">
-        <p> Where is the most distant point from land? What altitude does the highest permanent human settlement have?
-          Who was the first to reach the lowest point on Earth? Click on the orange icons on this globe to find out!
-        </p>
+        <p>Explore headlines from around the world. Click on the orange icons on this globe to read a sample news story for that location.</p>
         <button id="start-globe">Go to globe</button>
       </div>
       <div id="show-about" class="hidden">
