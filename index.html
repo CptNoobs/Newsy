@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="initial-scale=1" />
@@ -38,29 +37,30 @@
       "esri/core/watchUtils"
     ], function (Map, SceneView, TileLayer, GeoJSONLayer, Basemap, ExaggeratedElevationLayer, Graphic, Point, Mesh, watchUtils) {
 
-
-      const R = 6358137; // approximate radius of the Earth in m
-      const offset = 300000; // offset from the ground used for the clouds
+      const R = 6358137;           // Earth radius (m)
+      const offset = 300000;       // cloud layer offset (m)
       const NEWS_API_KEY = "29d48ba046dc41a08934611f681441f1";
-      const geocodeUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode";
+      const geocodeUrl  = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode";
 
+      /* --- Basemap & view ------------------------------------------------- */
 
       const basemap = new Basemap({
         baseLayers: [
           new TileLayer({
             url: "https://tiles.arcgis.com/tiles/nGt4QxSblgDfeJn9/arcgis/rest/services/terrain_with_heavy_bathymetry/MapServer",
-            copyright: "Bathymetry, topography and satellite imagery from <a href=\"https://visibleearth.nasa.gov/view_cat.php?categoryID=1484\" target=\"_blank\">NASA Visible Earth</a> | <a href=\"http://www.aag.org/global_ecosystems\" target=\"_blank\">World Ecological Land Units, AAG</a> | Oceans, glaciers and water bodies from <a href=\"https://www.naturalearthdata.com/\" target=\"_blank\">Natural Earth</a>"
+            copyright: `Bathymetry, topography and satellite imagery from
+              <a href="https://visibleearth.nasa.gov/view_cat.php?categoryID=1484" target="_blank">NASA Visible Earth</a> |
+              <a href="http://www.aag.org/global_ecosystems" target="_blank">World Ecological Land Units, AAG</a> |
+              Oceans, glaciers and water bodies from <a href="https://www.naturalearthdata.com/" target="_blank">Natural Earth</a>`
           })
         ]
       });
 
-      const map = new Map({
-        basemap: basemap
-      });
+      const map = new Map({ basemap });
 
       const view = new SceneView({
         container: "viewDiv",
-        map: map,
+        map,
         alphaCompositingEnabled: true,
         qualityProfile: "high",
         camera: {
@@ -69,193 +69,168 @@
           tilt: 0.13
         },
         environment: {
-          background: {
-            type: "color",
-            color: [255, 252, 244, 0]
-          },
+          background: { type: "color", color: [255, 252, 244, 0] },
           starsEnabled: false,
           atmosphereEnabled: false,
           lighting: {
             directShadowsEnabled: false,
-            date: "Sun Jun 23 2019 19:19:18 GMT+0200 (Central European Summer Time)"
+            date: "Sun Jun 23 2019 19:19:18 GMT+0200"
           }
         },
-        constraints: {
-          altitude: {
-            min: 10000000,
-            max: 25000000
-          }
-        },
+        constraints: { altitude: { min: 1e7, max: 2.5e7 } },
         popup: {
           dockEnabled: true,
-          dockOptions: {
-            position: "top-right",
-            breakpoint: false,
-            buttonEnabled: false
-          },
+          dockOptions: { position: "top-right", breakpoint: false, buttonEnabled: false },
           collapseEnabled: false
         },
-        highlightOptions: {
-          color: [255, 255, 255],
-          haloOpacity: 0.5
-        }
+        highlightOptions: { color: [255, 255, 255], haloOpacity: 0.5 }
       });
 
       view.ui.remove("navigation-toggle");
 
-      map.ground.layers = [new ExaggeratedElevationLayer({
-        exaggerationBathymetry: 60,
-        exaggerationTopography: 40
-      })];
+      /* --- Ground exaggeration ------------------------------------------- */
+      map.ground.layers = [
+        new ExaggeratedElevationLayer({
+          exaggerationBathymetry: 60,
+          exaggerationTopography: 40
+        })
+      ];
 
-      const origin = new Point({
-        x: 0, y: -90, z: -(2 * R)
-      });
+      /* --- Ocean shell ---------------------------------------------------- */
+      const origin = new Point({ x: 0, y: -90, z: -(2 * R) });
 
-      const oceanSurfaceMesh = Mesh.createSphere(
-        origin, {
-        size: {
-          width: 2 * R,
-          depth: 2 * R,
-          height: 2 * R
-        },
+      const oceanSurfaceMesh = Mesh.createSphere(origin, {
+        size: { width: 2 * R, depth: 2 * R, height: 2 * R },
         densificationFactor: 5,
-        material: {
-          color: [0, 210, 210, 0.8],
-          metallic: 0.9,
-          roughness: 0.8,
-          doubleSided: false
-        }
+        material: { color: [0, 210, 210, 0.8], metallic: 0.9, roughness: 0.8, doubleSided: false }
       });
 
-      const oceanSurface = new Graphic({
+      view.graphics.add(new Graphic({
         geometry: oceanSurfaceMesh,
-        symbol: {
-          type: "mesh-3d",
-          symbolLayers: [{
-            type: "fill"
-          }]
-        }
-      });
+        symbol: { type: "mesh-3d", symbolLayers: [{ type: "fill" }] }
+      }));
 
-      view.graphics.add(oceanSurface);
-
-      const cloudsSphere = Mesh.createSphere(new Point({
-        x: 0, y: -90, z: -(2 * R + offset)
-      }), {
+      /* --- Clouds sphere -------------------------------------------------- */
+      const cloudsSphere = Mesh.createSphere(
+        new Point({ x: 0, y: -90, z: -(2 * R + offset) }), {
         size: 2 * (R + offset),
-        material: {
-          colorTexture: './clouds-nasa.png',
-          doubleSided: false
-        },
+        material: { colorTexture: "./clouds-nasa.png", doubleSided: false },
         densificationFactor: 4
       });
 
       cloudsSphere.components[0].shading = "flat";
 
-      const clouds = new Graphic({
+      view.graphics.add(new Graphic({
         geometry: cloudsSphere,
-        symbol: {
-          type: "mesh-3d",
-          symbolLayers: [{ type: "fill" }]
-        }
-      });
+        symbol: { type: "mesh-3d", symbolLayers: [{ type: "fill" }] }
+      }));
 
-      view.graphics.add(clouds);
-
+      /* --- News layer ----------------------------------------------------- */
       const newsLayer = new GeoJSONLayer({
         url: "sample-news.geojson",
-        elevationInfo: {
-          mode: "absolute-height",
-          offset: offset
-        },
-        copyright: "Sample news data for demonstration purposes | <a href=\"https://visibleearth.nasa.gov/view.php?id=57747\" target=\"_blank\">Cloud image</a> from NASA Goddard Space Flight Center (image by Reto St\u00f6ckli) for the cloud layer",
+        elevationInfo: { mode: "absolute-height", offset },
+        copyright: `Sample news data for demonstration purposes |
+          <a href="https://visibleearth.nasa.gov/view.php?id=57747" target="_blank">Cloud image</a> from NASA`,
         renderer: {
           type: "simple",
           symbol: {
             type: "point-3d",
-            symbolLayers: [{
-              type: "icon",
-              resource: { primitive: "circle" },
-              material: { color: [0, 0, 0, 0] },
-              outline: { color: [245, 99, 66, 1], size: 4 },
-              size: 10
-            }, {
-              type: "icon",
-              resource: { primitive: "circle" },
-              material: { color: [0, 0, 0, 0] },
-              outline: { color: [245, 99, 66, 1], size: 2 },
-              size: 30
-            }]
+            symbolLayers: [
+              {
+                type: "icon",
+                resource: { primitive: "circle" },
+                material: { color: [0, 0, 0, 0] },
+                outline: { color: [245, 99, 66, 1], size: 4 },
+                size: 10
+              },
+              {
+                type: "icon",
+                resource: { primitive: "circle" },
+                material: { color: [0, 0, 0, 0] },
+                outline: { color: [245, 99, 66, 1], size: 2 },
+                size: 30
+              }
+            ]
           }
+        },
+        popupTemplate: {
+          title: "{name}",
+          content: `
+            <div class="popupDescription">
+              <p class="info"><span class="esri-icon-documentation"></span> {newsTitle}</p>
+              <p>{newsSummary}</p>
+              <p><a href="{newsUrl}" target="_blank">Read more</a></p>
+            </div>`
         }
       });
 
       map.layers.add(newsLayer);
 
-      view.on("click", function (event) {
-        showNewsAtPoint(event.mapPoint);
-      });
+      /* --- Dynamic click-anywhere news lookup ----------------------------- */
+      view.on("click", function (event) { showNewsAtPoint(event.mapPoint); });
 
       async function showNewsAtPoint(point) {
-        view.popup.open({
-          location: point,
-          title: "Loading news...",
-          content: "Fetching data"
-        });
+        view.popup.open({ location: point, title: "Loading news...", content: "Fetching data" });
         try {
           const geoResp = await fetch(`${geocodeUrl}?f=pjson&location=${point.longitude},${point.latitude}`);
           const geoJson = await geoResp.json();
-          const country = geoJson.address && geoJson.address.CountryCode;
-          const place = geoJson.address && (geoJson.address.City || geoJson.address.Region || geoJson.address.CountryCode) || "this location";
-          const news = await getNewsContent(country, place);
-          view.popup.title = news.title;
+          const country = geoJson.address?.CountryCode;
+          const place   = geoJson.address?.City || geoJson.address?.Region || geoJson.address?.CountryCode || "this location";
+          const news    = await getNewsContent(country, place);
+          view.popup.title   = news.title;
           view.popup.content = news.content;
         } catch (err) {
-          const sample = await getSampleContent();
-          view.popup.title = sample.title;
+          const sample       = await getSampleContent();
+          view.popup.title   = sample.title;
           view.popup.content = sample.content;
         }
       }
 
       async function getNewsContent(countryCode, placeName) {
-        const url = `https://newsapi.org/v2/top-headlines?country=${countryCode}&pageSize=1&apiKey=${NEWS_API_KEY}`;
-        const resp = await fetch(url);
+        const url   = `https://newsapi.org/v2/top-headlines?country=${countryCode}&pageSize=1&apiKey=${NEWS_API_KEY}`;
+        const resp  = await fetch(url);
         if (!resp.ok) throw new Error("News request failed");
-        const data = await resp.json();
-        const article = data.articles && data.articles[0];
-        if (!article) throw new Error("No article");
+        const data  = await resp.json();
+        const art   = data.articles?.[0];
+        if (!art)   throw new Error("No article");
         return {
           title: `News near ${placeName}`,
-          content: `<div class="popupDescription"><p class="info"><span class='esri-icon-documentation'></span> ${article.title}</p><p>${article.description || ''}</p><p><a href='${article.url}' target='_blank'>Read more</a></p></div>`
+          content: `
+            <div class="popupDescription">
+              <p class="info"><span class='esri-icon-documentation'></span> ${art.title}</p>
+              <p>${art.description || ""}</p>
+              <p><a href='${art.url}' target='_blank'>Read more</a></p>
+            </div>`
         };
       }
 
       async function getSampleContent() {
-        const resp = await fetch('sample-news.geojson');
-        const data = await resp.json();
+        const resp    = await fetch("sample-news.geojson");
+        const data    = await resp.json();
         const feature = data.features[Math.floor(Math.random() * data.features.length)].properties;
         return {
           title: feature.name,
-          content: `<div class="popupDescription"><p class="info"><span class='esri-icon-documentation'></span> ${feature.newsTitle}</p><p>${feature.newsSummary}</p><p><a href='${feature.newsUrl}' target='_blank'>Read more</a></p></div>`
+          content: `
+            <div class="popupDescription">
+              <p class="info"><span class='esri-icon-documentation'></span> ${feature.newsTitle}</p>
+              <p>${feature.newsSummary}</p>
+              <p><a href='${feature.newsUrl}' target='_blank'>Read more</a></p>
+            </div>`
         };
       }
 
+      /* --- UI: intro / about overlay & autorotation ----------------------- */
       document.getElementById("close-about").addEventListener("click", closeMenu);
 
-      document.getElementById("start-globe").addEventListener("click", function () {
+      document.getElementById("start-globe").addEventListener("click", () => {
         closeMenu();
-        view.when(function () {
-          watchUtils.whenFalseOnce(view, "updating", rotate);
-        });
+        view.when(() => watchUtils.whenFalseOnce(view, "updating", rotate));
       });
 
-      document.getElementById("container").addEventListener("click", function (e) {
+      document.getElementById("container").addEventListener("click", (e) => {
         if (e.target.id === "container") {
           closeMenu();
-          view.when(function () {
-            watchUtils.whenFalseOnce(view, "updating", rotate);
-          });
+          view.when(() => watchUtils.whenFalseOnce(view, "updating", rotate));
         }
       });
 
@@ -264,14 +239,14 @@
         view.container.style.filter = "blur(0px)";
       }
 
-      let intro = true;
-      document.getElementById("about").addEventListener("click", function () {
+      let introShown = true;
+      document.getElementById("about").addEventListener("click", () => {
         document.getElementById("container").style.display = "flex";
         view.container.style.filter = "blur(10px)";
-        if (intro) {
+        if (introShown) {
           document.getElementById("show-about").classList.remove("hidden");
           document.getElementById("show-intro").classList.add("hidden");
-          intro = false;
+          introShown = false;
         }
       });
 
@@ -293,26 +268,33 @@
   <div id="viewDiv">
     <div id="about">About this globe</div>
   </div>
+
   <div id="container">
     <div id="introDiv">
       <h1>Sample News Globe</h1>
+
       <div id="show-intro">
-        <p>Explore headlines from around the world. Click anywhere on the globe to read the latest news for that region.</p>
+        <!-- merged text: click anywhere OR icons -->
+        <p>
+          Explore headlines from around the world. Click anywhere on the globe
+          or tap the orange icons to read news for that region.
+        </p>
         <button id="start-globe">Go to globe</button>
       </div>
+
       <div id="show-about" class="hidden">
         <button id="close-about" class="esri-icon-close"></button>
-        <p>3D Globe created by <a href="https://www.esri.com/arcgis-blog/author/j_nelson/" target="_blank">John</a> and
-          <a href="https://www.esri.com/arcgis-blog/author/raluca_zurich/" target="_blank">Raluca</a> after getting
-          inspired by the <a href="https://www.half-earthproject.org/maps/" target="_blank">Half-Earth Project globe</a>, and <a href="https://www.fonterra.com/nz/en/campaign/from-here-to-everywhere.html#/home"
-            target="_blank">this awesome globe</a> and <a href="https://www.instagram.com/p/Bt8zyI-gsqW/"
-            target="_blank">this other awesome globe</a>. We used <a
-            href="https://developers.arcgis.com/javascript/" target="_blank">ArcGIS API for JavaScript</a> to create the interactive globe and <a href="https://pro.arcgis.com/"
-            target="_blank">ArcGIS Pro</a> to create the basemap. Many thanks to Arno Fiva, Christian Iten and Jesse van den Kieboom for the awesome feedback.</p>
-        <p>Read this <a href="https://www.esri.com/arcgis-blog/products/js-api-arcgis/3d-gis/interactive-3d-globe/" target="_blank">blog post</a> to find out how the globe was created. For the curious coders, here is the <a href="https://github.com/RalucaNicola/the-globe-of-extremes" target="_blank">Github repository</a>.</p>
+        <p>
+          3D Globe created by
+          <a href="https://www.esri.com/arcgis-blog/author/j_nelson/" target="_blank">John</a> and
+          <a href="https://www.esri.com/arcgis-blog/author/raluca_zurich/" target="_blank">Raluca</a>.
+          Read the
+          <a href="https://www.esri.com/arcgis-blog/products/js-api-arcgis/3d-gis/interactive-3d-globe/"
+            target="_blank">blog post</a> or check the
+          <a href="https://github.com/RalucaNicola/the-globe-of-extremes" target="_blank">GitHub repo</a>.
+        </p>
       </div>
     </div>
   </div>
 </body>
-
 </html>
