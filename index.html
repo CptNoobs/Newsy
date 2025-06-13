@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="initial-scale=1" />
-  <title>The globe of extremes</title>
+  <title>Sample News Globe</title>
 
   <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css" />
   <link rel="stylesheet" href="./style.css" />
@@ -41,6 +41,7 @@
 
       const R = 6358137; // approximate radius of the Earth in m
       const offset = 300000; // offset from the ground used for the clouds
+
 
       const basemap = new Basemap({
         baseLayers: [
@@ -160,13 +161,13 @@
 
       view.graphics.add(clouds);
 
-      const extremesLayer = new GeoJSONLayer({
-        url: "extreme-points.geojson",
+      const newsLayer = new GeoJSONLayer({
+        url: "sample-news.geojson",
         elevationInfo: {
           mode: "absolute-height",
           offset: offset
         },
-        copyright: "Data from <a href=\"https://en.wikipedia.org/wiki/Extreme_points_of_Earth\" target=\"_blank\">Extreme points on Earth</a> Wikipedia article | <a href=\"https://visibleearth.nasa.gov/view.php?id=57747\" target=\"_blank\">Cloud image</a> from NASA Goddard Space Flight Center (image by Reto Stöckli) for the cloud layer",
+        copyright: "Sample news data for demonstration purposes | <a href=\"https://visibleearth.nasa.gov/view.php?id=57747\" target=\"_blank\">Cloud image</a> from NASA Goddard Space Flight Center (image by Reto St\u00f6ckli) for the cloud layer",
         renderer: {
           type: "simple",
           symbol: {
@@ -189,29 +190,16 @@
         popupTemplate: {
           title: "{name}",
           content: `
-            <div class="popupImage">
-              <img src="{imageUrl}" alt="{imageCaption}"/>
-            </div>
-            <div class="popupImageCaption">{imageCaption}</div>
             <div class="popupDescription">
-              <p class="info">
-                <span class="esri-icon-favorites"></span> {type}
-              </p>
-              <p class="info">
-                <span class="esri-icon-map-pin"></span> {location}
-              </p>
-              <p class="info">
-                <span class="esri-icon-documentation"></span> {facts}
-              </p>
-            </div>
-            <div class="popupCredits">
-              Sources: <a href="{sourceUrl}" target="_blank">{source}</a> released under <a href="{sourceCopyrightUrl}">{sourceCopyright}</a>, <a href="{imageCopyrightUrl}" target="_blank">{imageCopyright}</a>.
+              <p class="info"><span class="esri-icon-documentation"></span> {newsTitle}</p>
+              <p>{newsSummary}</p>
+              <p><a href="{newsUrl}" target="_blank">Read more</a></p>
             </div>
           `
         }
       });
 
-      map.layers.add(extremesLayer);
+      map.layers.add(newsLayer);
 
       document.getElementById("close-about").addEventListener("click", closeMenu);
 
@@ -267,11 +255,9 @@
   </div>
   <div id="container">
     <div id="introDiv">
-      <h1>The globe of extremes</h1>
+      <h1>Sample News Globe</h1>
       <div id="show-intro">
-        <p> Where is the most distant point from land? What altitude does the highest permanent human settlement have?
-          Who was the first to reach the lowest point on Earth? Click on the orange icons on this globe to find out!
-        </p>
+        <p>Explore headlines from around the world. Click on the orange icons on this globe to read a sample news story for that location.</p>
         <button id="start-globe">Go to globe</button>
       </div>
       <div id="show-about" class="hidden">
