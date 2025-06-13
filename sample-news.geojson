@@ -1,0 +1,44 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "New York City",
+        "newsTitle": "Local Parade Celebrates Cultural Diversity",
+        "newsSummary": "Thousands gather in Manhattan to celebrate the annual Cultural Parade showcasing traditions from around the world.",
+        "newsUrl": "https://example.com/new-york-news"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0060, 40.7128]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "London",
+        "newsTitle": "Historic Site Reopens After Restoration",
+        "newsSummary": "The famous Tower of London has reopened to the public after months of renovations and preservation work.",
+        "newsUrl": "https://example.com/london-news"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-0.1276, 51.5074]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Tokyo",
+        "newsTitle": "Tech Expo Showcases Innovation",
+        "newsSummary": "Tech companies from across the globe gather in Tokyo to reveal their latest gadgets and innovations.",
+        "newsUrl": "https://example.com/tokyo-news"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.6917, 35.6895]
+      }
+    }
+  ]
+}
